@@ -1,13 +1,12 @@
 const hre = require("hardhat");
 
 async function main() {
-  const candidates = ["Alice", "Bob", "Charlie"];  // Customize candidates here
-
   const Voting = await hre.ethers.getContractFactory("SimpleVoting");
-  const voting = await Voting.deploy(candidates);
-  await voting.waitForDeployment();
+  const voting = await Voting.deploy();
 
-  console.log("Voting contract deployed to:", voting.target);
+  await voting.waitForDeployment();  // <-- here
+
+  console.log("Voting contract deployed to:", voting.target);  // `voting.target` contains address in ethers v6
 }
 
 main().catch((error) => {
