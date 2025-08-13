@@ -26,7 +26,7 @@ Clone the repository
 bash
 Copy
 Edit
-git clone https://github.com/yourusername/simple-voting.git
+git clone https://github.com/suhaimz11/simple-voting.git
 cd simple-voting
 Install dependencies
 
