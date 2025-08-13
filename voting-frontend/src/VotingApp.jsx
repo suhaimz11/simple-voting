@@ -3,6 +3,15 @@ import { BrowserProvider, Contract } from "ethers";
 
 const contractABI = [
   {
+    "inputs": [],
+    "name": "admin",
+    "outputs": [
+      { "internalType": "address", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "string",
@@ -157,7 +166,8 @@ const contractABI = [
   }
 ];
 
-const contractAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Replace with your deployed contract address
+
+const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707";
 
 export default function VotingApp() {
   const [provider, setProvider] = useState(null);
@@ -168,10 +178,19 @@ export default function VotingApp() {
   const [newCandidate, setNewCandidate] = useState("");
   const [selectedCandidate, setSelectedCandidate] = useState("");
   const [account, setAccount] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [metaMaskMissing, setMetaMaskMissing] = useState(false);
+  const [results, setResults] = useState(null);
+
+  const openModal = (message) => { setModalMessage(message); setModalOpen(true); };
+  const closeModal = () => setModalOpen(false);
 
   useEffect(() => {
     if (!window.ethereum) {
-      alert("Please install MetaMask!");
+      setMetaMaskMissing(true);
       return;
     }
 
@@ -180,14 +199,17 @@ export default function VotingApp() {
       setProvider(prov);
 
       await window.ethereum.request({ method: "eth_requestAccounts" });
-      const signer = await prov.getSigner();
-      setSigner(signer);
+      const signerInstance = await prov.getSigner();
+      setSigner(signerInstance);
 
-      const addr = await signer.getAddress();
+      const addr = await signerInstance.getAddress();
       setAccount(addr);
 
-      const votingContract = new Contract(contractAddress, contractABI, signer);
+      const votingContract = new Contract(contractAddress, contractABI, signerInstance);
       setContract(votingContract);
+
+      const adminAddress = await votingContract.admin();
+      setIsAdmin(adminAddress.toLowerCase() === addr.toLowerCase());
 
       await loadCandidates(votingContract);
       await checkVotingEnded(votingContract);
@@ -212,27 +234,27 @@ export default function VotingApp() {
   }
 
   async function addCandidate() {
-    if (!newCandidate.trim()) return alert("Enter candidate name");
+    if (!newCandidate.trim()) return openModal("Enter candidate name");
     try {
       const tx = await contract.addCandidate(newCandidate.trim());
       await tx.wait();
-      alert(`Candidate "${newCandidate}" added`);
+      openModal(`Candidate "${newCandidate}" added`);
       setNewCandidate("");
       await loadCandidates(contract);
     } catch (e) {
-      alert("Error adding candidate: " + (e.reason || e.message));
+      openModal("Error adding candidate: " + (e.reason || e.message));
     }
   }
 
   async function vote() {
-    if (!selectedCandidate) return alert("Select a candidate");
+    if (!selectedCandidate) return openModal("Select a candidate");
     try {
       const tx = await contract.vote(selectedCandidate);
       await tx.wait();
-      alert(`Voted for "${selectedCandidate}"`);
+      openModal(`Voted for "${selectedCandidate}"`);
       await checkVotingEnded(contract);
     } catch (e) {
-      alert("Voting error: " + (e.reason || e.message));
+      openModal("Voting error: " + (e.reason || e.message));
     }
   }
 
@@ -240,66 +262,112 @@ export default function VotingApp() {
     try {
       const tx = await contract.endVoting();
       await tx.wait();
-      alert("Voting ended");
       setVotingEnded(true);
+      openModal("Voting has ended");
     } catch (e) {
-      alert("Failed to end voting: " + (e.reason || e.message));
+      openModal("Failed to end voting: " + (e.reason || e.message));
     }
   }
 
   async function showResults() {
-    if (!votingEnded) return alert("Voting is not ended yet");
+    if (!votingEnded) return openModal("Voting is not ended yet");
     try {
       const [names, votes] = await contract.getResults();
-      let results = "";
-      for (let i = 0; i < names.length; i++) {
-        results += `${names[i]}: ${votes[i].toString()}\n`;
-      }
-      alert("Results:\n" + results);
+
+      // Convert votes safely
+      const voteCounts = votes.map(v => v.toNumber ? v.toNumber() : Number(v));
+
+      // Find winner
+      const maxVotes = Math.max(...voteCounts);
+      const winners = names.filter((name, i) => voteCounts[i] === maxVotes);
+
+      setResults({ names, voteCounts, winners });
     } catch (e) {
-      alert("Failed to fetch results: " + (e.reason || e.message));
+      openModal("Failed to fetch results: " + (e.reason || e.message));
     }
   }
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h2>Simple Voting DApp</h2>
-      <p><b>Connected account:</b> {account}</p>
+    <div className="app">
+      <div className="card">
+        <h1 className="app-title">BlockVote</h1>
+        <p className="account-info">Connected: <span>{account}</span></p>
+        {isAdmin && <p className="admin-badge">Admin</p>}
 
-      {!votingEnded && (
-        <>
-          <h3>Add Candidate</h3>
-          <input
-            type="text"
-            value={newCandidate}
-            onChange={(e) => setNewCandidate(e.target.value)}
-            placeholder="Candidate name"
-          />
-          <button onClick={addCandidate}>Add Candidate</button>
+        {!votingEnded && (
+          <>
+            {isAdmin && (
+              <div className="section">
+                <h2>Add Candidate</h2>
+                <input
+                  type="text"
+                  value={newCandidate}
+                  onChange={(e) => setNewCandidate(e.target.value)}
+                  placeholder="Candidate name"
+                  className="input-field"
+                />
+                <button onClick={addCandidate} className="btn yellow-btn">Add Candidate</button>
+              </div>
+            )}
 
-          <h3>Vote</h3>
-          <select
-            value={selectedCandidate}
-            onChange={(e) => setSelectedCandidate(e.target.value)}
-          >
-            <option value="">-- Select Candidate --</option>
-            {candidates.map((c, i) => (
-              <option key={i} value={c}>{c}</option>
+            <div className="section">
+              <h2>Vote</h2>
+              <select
+                value={selectedCandidate}
+                onChange={(e) => setSelectedCandidate(e.target.value)}
+                className="input-field"
+              >
+                <option value="">-- Select Candidate --</option>
+                {candidates.map((c, i) => <option key={i} value={c}>{c}</option>)}
+              </select>
+              <button onClick={vote} className="btn yellow-btn">Vote</button>
+            </div>
+
+            {isAdmin && (
+              <div className="section">
+                <h2>Admin Controls</h2>
+                <button onClick={endVoting} className="btn red-btn">End Voting</button>
+              </div>
+            )}
+          </>
+        )}
+
+        {votingEnded && (
+          <div className="section">
+            <h2>Voting Ended</h2>
+            <button onClick={showResults} className="btn green-btn">Show Results</button>
+          </div>
+        )}
+
+        {results && (
+          <div className="section">
+            <h2>Results</h2>
+            {results.names.map((name, i) => (
+              <p key={i}>{name}: {results.voteCounts[i]} vote{results.voteCounts[i] !== 1 ? 's' : ''}</p>
             ))}
-          </select>
-          <button onClick={vote}>Vote</button>
+            <h3 style={{ color: "#00ff99", marginTop: "15px" }}>
+              Winner: {results.winners.join(", ")} 🎉
+            </h3>
+            <p>Congratulations to the winner{results.winners.length > 1 ? "s" : ""}!</p>
+          </div>
+        )}
+      </div>
 
-          <h3>Admin</h3>
-          <button onClick={endVoting}>End Voting</button>
-        </>
-      )}
-
-      {votingEnded && (
-        <>
-          <h3>Voting Ended</h3>
-          <button onClick={showResults}>Show Results</button>
-        </>
+      {(modalOpen || metaMaskMissing) && (
+        <div className="modal-overlay" onClick={() => { setModalOpen(false); setMetaMaskMissing(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <p>{metaMaskMissing ? "Please install MetaMask!" : modalMessage}</p>
+            <button
+              onClick={() => { setModalOpen(false); setMetaMaskMissing(false); }}
+              className="btn yellow-btn modal-close"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+
+

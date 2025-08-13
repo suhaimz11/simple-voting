@@ -2,24 +2,36 @@
 pragma solidity ^0.8.18;
 
 contract SimpleVoting {
+    address public admin; // Store admin address
     string[] public candidates;
     mapping(string => uint) private votes;
     mapping(address => bool) public hasVoted;
     bool public votingEnded = false;
 
+    // Set admin when deploying
+    constructor() {
+        admin = msg.sender;
+    }
+
+    // Modifiers
     modifier onlyWhileVotingActive() {
         require(!votingEnded, "Voting has ended");
         _;
     }
 
-    // Add a candidate (anyone can call; you can add access control if needed)
-    function addCandidate(string memory candidate) public {
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can perform this action");
+        _;
+    }
+
+    // Add a candidate (admin only)
+    function addCandidate(string memory candidate) public onlyAdmin {
         require(!validCandidate(candidate), "Candidate already exists");
         require(!votingEnded, "Cannot add candidates after voting ended");
         candidates.push(candidate);
     }
 
-    // Vote for a candidate while voting is active
+    // Vote for a candidate while voting is active (anyone can vote)
     function vote(string memory candidate) public onlyWhileVotingActive {
         require(!hasVoted[msg.sender], "You already voted");
         require(validCandidate(candidate), "Candidate not found");
@@ -28,8 +40,8 @@ contract SimpleVoting {
         hasVoted[msg.sender] = true;
     }
 
-    // End the voting (can be called by anyone; add access control if needed)
-    function endVoting() public {
+    // End the voting (admin only)
+    function endVoting() public onlyAdmin {
         votingEnded = true;
     }
 
