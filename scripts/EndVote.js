@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 async function main() {
   const signers = await ethers.getSigners();
 
-  const votingAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const votingAddress = "ENTER_YOUR_VOTING_CONTRACT_ADDRESS_HERE"; // Replace with your deployed contract address
   const Voting = await ethers.getContractFactory("SimpleVoting");
   const voting = Voting.attach(votingAddress).connect(signers[0]); // Use first signer as admin
 

@@ -167,7 +167,7 @@ const contractABI = [
 ];
 
 
-const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707";
+const contractAddress = "ENTER CONTRACT ADDRESS HERE"; // Replace with your contract address
 
 export default function VotingApp() {
   const [provider, setProvider] = useState(null);
@@ -184,6 +184,7 @@ export default function VotingApp() {
   const [modalOpen, setModalOpen] = useState(false);
   const [metaMaskMissing, setMetaMaskMissing] = useState(false);
   const [results, setResults] = useState(null);
+  const [showResultsButton, setShowResultsButton] = useState(true);
 
   const openModal = (message) => { setModalMessage(message); setModalOpen(true); };
   const closeModal = () => setModalOpen(false);
@@ -273,15 +274,12 @@ export default function VotingApp() {
     if (!votingEnded) return openModal("Voting is not ended yet");
     try {
       const [names, votes] = await contract.getResults();
-
-      // Convert votes safely
       const voteCounts = votes.map(v => v.toNumber ? v.toNumber() : Number(v));
-
-      // Find winner
       const maxVotes = Math.max(...voteCounts);
       const winners = names.filter((name, i) => voteCounts[i] === maxVotes);
 
       setResults({ names, voteCounts, winners });
+      setShowResultsButton(false); // hide the button after showing results
     } catch (e) {
       openModal("Failed to fetch results: " + (e.reason || e.message));
     }
@@ -335,7 +333,9 @@ export default function VotingApp() {
         {votingEnded && (
           <div className="section">
             <h2>Voting Ended</h2>
-            <button onClick={showResults} className="btn green-btn">Show Results</button>
+            {showResultsButton && (
+              <button onClick={showResults} className="btn green-btn">Show Results</button>
+            )}
           </div>
         )}
 
@@ -369,5 +369,3 @@ export default function VotingApp() {
     </div>
   );
 }
-
-
